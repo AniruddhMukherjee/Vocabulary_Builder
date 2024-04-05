@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 
 void main() {
@@ -23,6 +25,15 @@ class ReservationScreen extends StatefulWidget {
 }
 
 class _ReservationScreenState extends State<ReservationScreen> {
+  final List<String> restaurantNames = [
+    'Restaurant A',
+    'Restaurant B',
+    'Restaurant C',
+    'Restaurant D',
+    'Restaurant E',
+    'Restaurant F',
+  ];
+
   List<Reservation> reservations = [];
 
   @override
@@ -30,44 +41,108 @@ class _ReservationScreenState extends State<ReservationScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text('Restaurant Reservation'),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.list),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => MyReservations(reservations)),
+              );
+            },
+          ),
+        ],
       ),
-      body: ListView.builder(
-        itemCount: reservations.length,
-        itemBuilder: (BuildContext context, int index) {
-          return ListTile(
-            title: Text(reservations[index].name),
-            subtitle: Text(
-                'Date: ${reservations[index].date}, Time: ${reservations[index].time}, ${reservations[index].numberOfPeople} people, ${reservations[index].vegOrNonVeg}, Special Requests: ${reservations[index].note}'),
-            trailing: IconButton(
-              icon: Icon(Icons.delete),
-              onPressed: () {
-                setState(() {
-                  reservations.removeAt(index);
-                });
-              },
-            ),
-          );
-        },
+      body: ListView(
+        children: [
+          ListTile(
+            title: Text('Choose a Restaurant'),
+          ),
+          ..._buildRestaurantList(),
+        ],
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => AddReservationScreen()),
-          );
-          if (result != null) {
-            setState(() {
-              reservations.add(result);
-            });
+          final selectedRestaurant = await _showRestaurantSelectionDialog();
+          if (selectedRestaurant != null) {
+            final result = await Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (context) =>
+                      AddReservationScreen(selectedRestaurant)),
+            );
+            if (result != null) {
+              setState(() {
+                reservations.add(result);
+              });
+            }
           }
         },
-        child: Icon(Icons.add),
+        icon: Icon(Icons.add),
+        label: Text('Add Reservation'),
       ),
+    );
+  }
+
+  List<Widget> _buildRestaurantList() {
+    final random = Random();
+    final List<String> randomRestaurantNames = [];
+    while (randomRestaurantNames.length < 3) {
+      final index = random.nextInt(restaurantNames.length);
+      final restaurantName = restaurantNames[index];
+      if (!randomRestaurantNames.contains(restaurantName)) {
+        randomRestaurantNames.add(restaurantName);
+      }
+    }
+    return randomRestaurantNames.map((name) {
+      return ListTile(
+        title: Text(name),
+        onTap: () {
+          _navigateToAddReservationScreen(name);
+        },
+      );
+    }).toList();
+  }
+
+  Future<void> _navigateToAddReservationScreen(String restaurantName) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+          builder: (context) => AddReservationScreen(restaurantName)),
+    );
+    if (result != null) {
+      setState(() {
+        reservations.add(result);
+      });
+    }
+  }
+
+  Future<String?> _showRestaurantSelectionDialog() async {
+    return await showDialog<String>(
+      context: context,
+      builder: (BuildContext context) {
+        return SimpleDialog(
+          title: Text('Select Restaurant'),
+          children: restaurantNames.map((name) {
+            return SimpleDialogOption(
+              onPressed: () {
+                Navigator.pop(context, name);
+              },
+              child: Text(name),
+            );
+          }).toList(),
+        );
+      },
     );
   }
 }
 
 class AddReservationScreen extends StatefulWidget {
+  final String selectedRestaurant;
+
+  AddReservationScreen(this.selectedRestaurant);
+
   @override
   _AddReservationScreenState createState() => _AddReservationScreenState();
 }
@@ -80,32 +155,6 @@ class _AddReservationScreenState extends State<AddReservationScreen> {
   DateTime selectedDate = DateTime.now();
   TimeOfDay selectedTime = TimeOfDay.now();
 
-  Future<void> _selectDate(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: selectedDate,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(Duration(days: 365)), // One year ahead
-    );
-    if (picked != null && picked != selectedDate) {
-      setState(() {
-        selectedDate = picked;
-      });
-    }
-  }
-
-  Future<void> _selectTime(BuildContext context) async {
-    final TimeOfDay? picked = await showTimePicker(
-      context: context,
-      initialTime: selectedTime,
-    );
-    if (picked != null && picked != selectedTime) {
-      setState(() {
-        selectedTime = picked;
-      });
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -117,6 +166,7 @@ class _AddReservationScreenState extends State<AddReservationScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
+            Text('Restaurant: ${widget.selectedRestaurant}'),
             TextField(
               controller: nameController,
               decoration: InputDecoration(labelText: 'Name'),
@@ -172,28 +222,72 @@ class _AddReservationScreenState extends State<AddReservationScreen> {
             SizedBox(height: 20),
             ElevatedButton(
               onPressed: () {
+                int? numberOfPeople =
+                    int.tryParse(numberOfPeopleController.text);
                 if (nameController.text.isNotEmpty &&
-                    numberOfPeopleController.text.isNotEmpty) {
+                    numberOfPeople != null &&
+                    numberOfPeople > 0) {
                   Navigator.pop(
                     context,
                     Reservation(
                       name: nameController.text,
                       note: noteController.text,
-                      numberOfPeople: int.parse(numberOfPeopleController.text),
+                      numberOfPeople: numberOfPeople,
                       vegOrNonVeg: dropdownValue,
                       date:
                           "${selectedDate.year}-${selectedDate.month}-${selectedDate.day}",
                       time: "${selectedTime.hour}:${selectedTime.minute}",
+                      restaurant: widget.selectedRestaurant,
+                    ),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                          'Invalid input. Please check your input and try again.'),
                     ),
                   );
                 }
               },
-              child: Text('Save'),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                    vertical: 16.0, horizontal: 32.0),
+                child: Text(
+                  'Save',
+                  style: TextStyle(fontSize: 20.0),
+                ),
+              ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: selectedDate,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(Duration(days: 365)), // One year ahead
+    );
+    if (picked != null && picked != selectedDate) {
+      setState(() {
+        selectedDate = picked;
+      });
+    }
+  }
+
+  Future<void> _selectTime(BuildContext context) async {
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: selectedTime,
+    );
+    if (picked != null && picked != selectedTime) {
+      setState(() {
+        selectedTime = picked;
+      });
+    }
   }
 }
 
@@ -204,6 +298,7 @@ class Reservation {
   final String vegOrNonVeg;
   final String date;
   final String time;
+  final String restaurant;
 
   Reservation({
     required this.name,
@@ -212,5 +307,68 @@ class Reservation {
     required this.vegOrNonVeg,
     required this.date,
     required this.time,
+    required this.restaurant,
   });
+}
+
+class MyReservations extends StatelessWidget {
+  final List<Reservation> reservations;
+
+  MyReservations(this.reservations);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('My Reservations'),
+      ),
+      body: ListView.builder(
+        itemCount: reservations.length,
+        itemBuilder: (context, index) {
+          final reservation = reservations[index];
+          return ListTile(
+            title: Text(reservation.name),
+            subtitle: Text('${reservation.date} at ${reservation.time}'),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => ReservationDetails(reservation)),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+class ReservationDetails extends StatelessWidget {
+  final Reservation reservation;
+
+  ReservationDetails(this.reservation);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Reservation Details'),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Name: ${reservation.name}'),
+            Text('Restaurant: ${reservation.restaurant}'),
+            Text('Date: ${reservation.date}'),
+            Text('Time: ${reservation.time}'),
+            Text('Number of People: ${reservation.numberOfPeople}'),
+            Text('Special Requests: ${reservation.note}'),
+            Text('Veg/Non-Veg: ${reservation.vegOrNonVeg}'),
+          ],
+        ),
+      ),
+    );
+  }
 }
