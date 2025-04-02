@@ -1,4 +1,4 @@
-# Restaurant Reservation
+# German Helping App
 
 Certainly! Here's a detailed description of your mobile application development project:
 
