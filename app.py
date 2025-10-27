@@ -76,7 +76,7 @@ def configure_genai():
         if 'api_key' in st.session_state and st.session_state.api_key:
             api_key = st.session_state.api_key
             genai.configure(api_key=api_key)
-            return genai.GenerativeModel('gemini-1.5-flash')
+            return genai.GenerativeModel('gemini-2.5-flash')
         else:
             # No API key found
             return None
